@@ -5,6 +5,9 @@ import AppKit
 struct Entry {
     static func main() {
         let args = CommandLine.arguments
+        if let index = args.firstIndex(of: "--check"), args.count > index + 1 {
+            SelfTest.check(path: args[index + 1])
+        }
         if let index = args.firstIndex(of: "--selftest") {
             let seconds = args.count > index + 1 ? (Double(args[index + 1]) ?? 6) : 6
             var region: CGRect?

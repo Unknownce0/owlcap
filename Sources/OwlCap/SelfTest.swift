@@ -7,6 +7,32 @@ import AppKit
 /// actually landed in the file. This is the quickest way to prove computer audio works.
 enum SelfTest {
 
+    /// `OwlCap --check <file>` — writes what permission this process actually has.
+    ///
+    /// This has to exist because running the binary from a terminal is NOT a fair test:
+    /// a process launched that way inherits the *terminal's* screen-recording grant, so
+    /// it can succeed while the app itself is denied. Launch it through LaunchServices
+    /// (`open -a OwlCap --args --check /tmp/owlcap-check.txt`) to see the truth.
+    static func check(path: String) -> Never {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.prohibited)
+        Task { @MainActor in
+            var lines = ["preflight: \(Recorder.hasScreenPermission() ? "granted" : "denied")"]
+            do {
+                let content = try await Recorder.shareableContent()
+                lines.append("displays visible: \(content.displays.count)")
+                lines.append("windows visible: \(content.windows.count)")
+            } catch {
+                lines.append("shareable content failed: \(error.localizedDescription)")
+            }
+            lines.append("bundle: \(Bundle.main.bundlePath)")
+            try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            exit(0)
+        }
+        app.run()
+        exit(0)
+    }
+
     static func run(seconds: Double, includeMic: Bool, audioOnly: Bool, region: CGRect?) -> Never {
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)

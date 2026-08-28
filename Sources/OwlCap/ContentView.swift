@@ -82,12 +82,30 @@ struct ContentView: View {
     private var permissionBanner: some View {
         banner(icon: "lock.shield", tint: .orange,
                title: "Screen & System Audio Recording is off",
-               message: "macOS won't let OwlCap see your screen or hear your Mac until you switch it on.") {
-            Button("Open System Settings") {
-                Recorder.requestScreenPermission()
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+               message: """
+               macOS won't let OwlCap see your screen or hear your Mac until you switch it on:
+
+               1. Open System Settings and switch OwlCap on. If OwlCap is already listed                and switched on, select it, remove it with the − button, then come back                here and press Record — a stale entry has to go before a new one can stick.
+               2. Come back and choose Quit & Reopen. macOS only hands the permission to a                freshly launched app, so this step is not optional.
+               """) {
+            HStack {
+                Button("Open System Settings") {
+                    _ = Recorder.requestScreenPermission()
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+                }
+                Button("Quit & Reopen") { Self.relaunch() }
             }
         }
+    }
+
+    /// Relaunches through LaunchServices, which is the only way a new TCC grant takes effect.
+    static func relaunch() {
+        let path = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "sleep 1; open -n \"\(path)\""]
+        try? task.run()
+        NSApp.terminate(nil)
     }
 
     private func errorBanner(_ text: String) -> some View {
