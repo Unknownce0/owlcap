@@ -50,6 +50,18 @@ enum VideoCodecChoice: String, CaseIterable, Identifiable {
     var avCodec: AVVideoCodecType { self == .hevc ? .hevc : .h264 }
 }
 
+enum AfterRecording: String, CaseIterable, Identifiable {
+    case openInPlayer, revealInFinder, doNothing
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .openInPlayer:   return "Open in QuickTime Player"
+        case .revealInFinder: return "Show in Finder"
+        case .doNothing:      return "Do Nothing"
+        }
+    }
+}
+
 enum ContainerFormat: String, CaseIterable, Identifiable {
     case mov, mp4
     var id: String { rawValue }
@@ -78,6 +90,11 @@ final class Settings: ObservableObject {
     @Published var revealInFinder: Bool { didSet { save(revealInFinder, "reveal") } }
     @Published var audioOnly: Bool { didSet { save(audioOnly, "audioOnly") } }
     @Published var saveFolderPath: String { didSet { save(saveFolderPath, "saveFolder") } }
+    @Published var rememberSelection: Bool { didSet { save(rememberSelection, "rememberSelection") } }
+    @Published var afterRecording: AfterRecording { didSet { save(afterRecording.rawValue, "afterRecording") } }
+    /// The last selected area, remembered between recordings the way QuickTime does.
+    /// Stored in global screen points, bottom-left origin.
+    @Published var savedRegion: CGRect? { didSet { save(Self.encode(savedRegion), "savedRegion") } }
 
     private let d = UserDefaults.standard
     /// A transient copy (used by --selftest) reads preferences but never writes them back.
@@ -99,7 +116,8 @@ final class Settings: ObservableObject {
         let d = UserDefaults.standard
         d.register(defaults: [
             "systemAudio": true, "micAudio": false, "cursor": true, "clicks": false,
-            "countdown": 3, "fps": 60, "retina": true, "reveal": true, "audioOnly": false,
+            "countdown": 0, "fps": 60, "retina": true, "reveal": true, "audioOnly": false,
+            "rememberSelection": true,
         ])
         source = CaptureSource(rawValue: d.string(forKey: "source") ?? "") ?? .display
         displayID = CGDirectDisplayID(d.integer(forKey: "displayID"))
@@ -116,12 +134,26 @@ final class Settings: ObservableObject {
         retinaScale = d.bool(forKey: "retina")
         revealInFinder = d.bool(forKey: "reveal")
         audioOnly = d.bool(forKey: "audioOnly")
+        rememberSelection = d.bool(forKey: "rememberSelection")
+        afterRecording = AfterRecording(rawValue: d.string(forKey: "afterRecording") ?? "") ?? .openInPlayer
+        savedRegion = Self.decode(d.string(forKey: "savedRegion"))
         saveFolderPath = d.string(forKey: "saveFolder")
             ?? FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first?.path
             ?? NSHomeDirectory()
     }
 
     var saveFolder: URL { URL(fileURLWithPath: saveFolderPath, isDirectory: true) }
+
+    private static func encode(_ rect: CGRect?) -> String {
+        guard let rect else { return "" }
+        return "\(rect.origin.x),\(rect.origin.y),\(rect.width),\(rect.height)"
+    }
+
+    private static func decode(_ text: String?) -> CGRect? {
+        guard let parts = text?.split(separator: ",").compactMap({ Double($0) }), parts.count == 4,
+              parts[2] > 1, parts[3] > 1 else { return nil }
+        return CGRect(x: parts[0], y: parts[1], width: parts[2], height: parts[3])
+    }
 
     func outputURL() -> URL {
         let fmt = DateFormatter()

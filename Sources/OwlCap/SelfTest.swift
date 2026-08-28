@@ -59,7 +59,7 @@ enum SelfTest {
             settings.captureSystemAudio = true
             settings.captureMicrophone = includeMic
             settings.countdown = 0
-            settings.revealInFinder = false
+            settings.afterRecording = .doNothing
             settings.highlightClicks = false
 
             let recorder = Recorder()

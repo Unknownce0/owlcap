@@ -9,31 +9,47 @@ installing a virtual audio driver like BlackHole or Soundflower and rerouting yo
 output through it. OwlCap skips all of that: macOS has had a proper system-audio tap in
 ScreenCaptureKit since Ventura, and OwlCap uses it directly.
 
-## What it does
+## How you use it
 
-**Everything QuickTime's screen recording had**
+It works the way QuickTime does, not like a settings app. There is no window to fill in.
 
-- Record the entire screen, on whichever display you choose
-- Record a selected portion — drag to pick an area
-- Record a single window, or every window belonging to one app
-- Show or hide the pointer
-- Highlight mouse clicks
-- A 3 / 5 / 10 second countdown before it starts
-- Audio-only recording, saved as `.m4a`
-- Stop from the menu bar, or with ⌘⌃⎋ from anywhere
+Open OwlCap — or press **⌃⌘N** from its menu bar while you are in another app — and a
+small bar appears at the bottom of the screen:
 
-**Plus the parts it was missing**
+```
+ ✕ │ [ Screen ] [ Area ] [ Window ] [ Audio ] │ Options ▾ │  Record
+```
 
-- **Computer audio.** Captured straight from macOS — no BlackHole, no Soundflower, no
-  changing your output device.
-- **Both at once.** System audio and your microphone are mixed into one track, so
+Pick what to record, press **Record**, and the bar gets out of the way. A stop button
+with the running time appears in the menu bar, and **⌘⌃⎋** stops from anywhere — the
+same shortcut QuickTime uses.
+
+- **Area** dims the screen and lets you drag out a rectangle. You can move it and drag
+  its handles to resize, and it is **remembered for next time**, so recording the same
+  corner of the screen twice takes one click.
+- **Window** dims the screen and highlights whatever window you point at. Click it and
+  recording starts.
+- **Audio** records sound only, with no video, straight to `.m4a`.
+
+`File › New Screen Recording` is **⌃⌘N** and `New Audio Recording` is **⇧⌘N**, matching
+QuickTime's shortcuts, so the muscle memory carries over.
+
+## What's in Options
+
+Everything QuickTime put there, in the same order — **Save To**, **Timer**
+(none / 5s / 10s), **Microphone**, **Remember Last Selection**, **Show Mouse Pointer**,
+**Show Mouse Clicks** — plus the parts it never had:
+
+- **Computer Audio.** The whole reason this exists. Captured straight from macOS, with
+  no BlackHole, no Soundflower, and no changing your output device.
+- Computer audio and a microphone **at the same time**, mixed into one track, so
   narration over a video just works.
-- **Live meters.** You can see the sound going in before and while you record, so you
-  never end up with a silent file you didn't notice until afterwards.
-- **Pause and resume** mid-recording.
-- **Real quality controls** — 24/30/60 fps, HEVC or H.264, three quality levels,
-  `.mov` or `.mp4`, and full Retina resolution on or off.
-- Choose where recordings are saved.
+- **Quality** — 24/30/60 fps, HEVC or H.264, `.mov` or `.mp4`, three quality levels, and
+  full Retina resolution on or off.
+- **When Finished** — open the recording in QuickTime Player, show it in Finder, or
+  neither.
+
+Recordings can also be paused and resumed mid-take, from the menu bar stop button.
 
 ## Install
 

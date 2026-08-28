@@ -286,8 +286,10 @@ final class Recorder: ObservableObject {
                 } else if let url = self.outputURL,
                           FileManager.default.fileExists(atPath: url.path) {
                     self.lastOutput = url
-                    if Settings.shared.revealInFinder {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    switch Settings.shared.afterRecording {
+                    case .openInPlayer:   NSWorkspace.shared.open(url)
+                    case .revealInFinder: NSWorkspace.shared.activateFileViewerSelecting([url])
+                    case .doNothing:      break
                     }
                 }
             }
