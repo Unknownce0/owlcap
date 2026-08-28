@@ -6,7 +6,7 @@ import CoreMedia
 /// Owns the AVAssetWriter and everything that touches it. Every mutation happens on
 /// `queue`, which is also the sample-handler queue we hand to SCStream, so there is
 /// exactly one thread writing the movie.
-final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate {
+final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
 
     let queue = DispatchQueue(label: "com.unknownce.owlcap.capture")
 
@@ -22,6 +22,12 @@ final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate {
 
     /// Called (off the main thread) if ScreenCaptureKit tears the stream down on us.
     var onStreamError: ((Error) -> Void)?
+
+    /// Counters, for `--selftest` and for diagnosing a silent recording.
+    private(set) var systemAudioReceived = 0
+    private(set) var micReceived = 0
+    private(set) var audioAppended = 0
+    private(set) var audioDropped = 0
 
     init(writer: AVAssetWriter,
          videoInput: AVAssetWriterInput?,
@@ -128,6 +134,7 @@ final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func handleSystemAudio(_ sample: CMSampleBuffer) {
         guard let pipeline else { return }
+        systemAudioReceived += 1
         guard let pts = adjust(CMSampleBufferGetPresentationTimeStamp(sample)) else { return }
         guard startSessionIfNeeded(at: pts, fromVideo: false) else { return }
         pipeline.handleSystem(sample, pts: pts)
@@ -135,6 +142,7 @@ final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func handleMic(_ sample: CMSampleBuffer) {
         guard let pipeline, writer.status == .writing else { return }
+        micReceived += 1
         if pipeline.mixesSystemAudio {
             // System audio drives the clock; this just tops up the mix buffer.
             guard !paused else { return }
@@ -148,7 +156,14 @@ final class CaptureWriter: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func appendAudio(_ buffer: CMSampleBuffer) {
         guard let audioInput, sessionStarted, writer.status == .writing,
-              audioInput.isReadyForMoreMediaData else { return }
-        audioInput.append(buffer)
+              audioInput.isReadyForMoreMediaData else {
+            audioDropped += 1
+            return
+        }
+        if audioInput.append(buffer) {
+            audioAppended += 1
+        } else {
+            audioDropped += 1
+        }
     }
 }

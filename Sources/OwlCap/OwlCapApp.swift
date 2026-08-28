@@ -7,7 +7,17 @@ struct Entry {
         let args = CommandLine.arguments
         if let index = args.firstIndex(of: "--selftest") {
             let seconds = args.count > index + 1 ? (Double(args[index + 1]) ?? 6) : 6
-            SelfTest.run(seconds: seconds, includeMic: args.contains("--mic"))
+            var region: CGRect?
+            if let r = args.firstIndex(of: "--region"), args.count > r + 1 {
+                let parts = args[r + 1].split(separator: ",").compactMap { Double($0) }
+                if parts.count == 4 {
+                    region = CGRect(x: parts[0], y: parts[1], width: parts[2], height: parts[3])
+                }
+            }
+            SelfTest.run(seconds: seconds,
+                         includeMic: args.contains("--mic"),
+                         audioOnly: args.contains("--audio-only"),
+                         region: region)
         }
         OwlCapApp.main()
     }

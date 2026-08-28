@@ -118,7 +118,9 @@ final class AudioPipeline {
         return m
     }
 
-    /// Convert an incoming CMSampleBuffer of PCM into our canonical format.
+    /// Convert an incoming CMSampleBuffer of PCM into our canonical format, into memory
+    /// we own. The sample's own buffers are only valid inside `withAudioBufferList`, so
+    /// every copy and conversion has to finish before that closure returns.
     static func convert(_ sample: CMSampleBuffer,
                         to format: AVAudioFormat,
                         cache: inout [String: AVAudioConverter]) -> AVAudioPCMBuffer? {
@@ -138,62 +140,55 @@ final class AudioPipeline {
         guard let inFormat else { return nil }
 
         let inFrames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sample))
-        guard inFrames > 0,
-              let inBuffer = AVAudioPCMBuffer(pcmFormat: inFormat, frameCapacity: inFrames)
-        else { return nil }
-        inBuffer.frameLength = inFrames
-
-        // Copy the sample data into a buffer we own.
-        var blockBuffer: CMBlockBuffer?
-        let abl = inBuffer.mutableAudioBufferList
-        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sample,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: abl,
-            bufferListSize: MemoryLayout<AudioBufferList>.size + MemoryLayout<AudioBuffer>.size * Int(max(1, inFormat.channelCount)),
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
-            blockBufferOut: &blockBuffer)
-        guard status == noErr else { return nil }
-
-        if inFormat == format {
-            let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: inFrames)
-            copy?.frameLength = inFrames
-            if let copy, let src = inBuffer.floatChannelData?[0], let dst = copy.floatChannelData?[0] {
-                dst.update(from: src, count: Int(inFrames) * Int(format.channelCount))
-                return copy
-            }
-            return inBuffer
-        }
+        guard inFrames > 0 else { return nil }
 
         let key = "\(inFormat.sampleRate)-\(inFormat.channelCount)-\(inFormat.commonFormat.rawValue)-\(inFormat.isInterleaved)"
-        let converter: AVAudioConverter
-        if let cached = cache[key] {
-            converter = cached
-        } else {
-            guard let made = AVAudioConverter(from: inFormat, to: format) else { return nil }
-            cache[key] = made
-            converter = made
-        }
-
-        let ratio = format.sampleRate / inFormat.sampleRate
-        let capacity = AVAudioFrameCount(Double(inFrames) * ratio) + 1024
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
-
-        var supplied = false
-        var error: NSError?
-        converter.convert(to: outBuffer, error: &error) { _, outStatus in
-            if supplied {
-                outStatus.pointee = .noDataNow
-                return nil
+        var converter: AVAudioConverter?
+        if inFormat != format {
+            if let cached = cache[key] {
+                converter = cached
+            } else {
+                guard let made = AVAudioConverter(from: inFormat, to: format) else { return nil }
+                cache[key] = made
+                converter = made
             }
-            supplied = true
-            outStatus.pointee = .haveData
-            return inBuffer
         }
-        if error != nil || outBuffer.frameLength == 0 { return nil }
-        return outBuffer
+
+        var output: AVAudioPCMBuffer?
+        try? sample.withAudioBufferList { abl, _ in
+            guard let source = AVAudioPCMBuffer(pcmFormat: inFormat,
+                                                bufferListNoCopy: abl.unsafePointer) else { return }
+            guard let converter else {
+                // Same format already — just take our own copy of the samples.
+                guard let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: source.frameLength),
+                      let src = source.floatChannelData, let dst = copy.floatChannelData
+                else { return }
+                copy.frameLength = source.frameLength
+                let perBuffer = Int(source.frameLength) * (format.isInterleaved ? Int(format.channelCount) : 1)
+                for channel in 0..<(format.isInterleaved ? 1 : Int(format.channelCount)) {
+                    dst[channel].update(from: src[channel], count: perBuffer)
+                }
+                output = copy
+                return
+            }
+
+            let ratio = format.sampleRate / inFormat.sampleRate
+            let capacity = AVAudioFrameCount(Double(source.frameLength) * ratio) + 1024
+            guard let converted = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return }
+            var supplied = false
+            var error: NSError?
+            converter.convert(to: converted, error: &error) { _, outStatus in
+                if supplied {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                supplied = true
+                outStatus.pointee = .haveData
+                return source
+            }
+            if error == nil && converted.frameLength > 0 { output = converted }
+        }
+        return output
     }
 
     /// Wrap PCM back up as a CMSampleBuffer so AVAssetWriter will take it.

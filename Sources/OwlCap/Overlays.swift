@@ -134,25 +134,34 @@ final class CountdownOverlay {
 
 /// Drag-to-select overlay. Returns the chosen rect in the display's own point
 /// coordinates (top-left origin), which is what SCStreamConfiguration.sourceRect wants.
+@MainActor
 final class RegionSelector {
     private var windows: [OverlayWindow] = []
     private var continuation: CheckedContinuation<(CGDirectDisplayID, CGRect)?, Never>?
 
     func select() async -> (CGDirectDisplayID, CGRect)? {
         await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            for screen in NSScreen.screens {
-                let window = OverlayWindow(frame: screen.frame, interactive: true)
-                let view = RegionView(frame: NSRect(origin: .zero, size: screen.frame.size))
-                view.screen = screen
-                view.onFinish = { [weak self] result in self?.finish(result) }
-                window.contentView = view
-                window.makeKeyAndOrderFront(nil)
-                window.orderFrontRegardless()
-                windows.append(window)
+            // select() is only ever called from the main actor, so the overlay setup
+            // below is already where AppKit needs it to be.
+            MainActor.assumeIsolated {
+                self.continuation = continuation
+                self.present()
             }
-            NSApp.activate(ignoringOtherApps: true)
         }
+    }
+
+    private func present() {
+        for screen in NSScreen.screens {
+            let window = OverlayWindow(frame: screen.frame, interactive: true)
+            let view = RegionView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            view.screen = screen
+            view.onFinish = { [weak self] result in self?.finish(result) }
+            window.contentView = view
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            windows.append(window)
+        }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func finish(_ result: (CGDirectDisplayID, CGRect)?) {

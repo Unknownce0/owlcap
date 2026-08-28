@@ -59,6 +59,11 @@ final class Recorder: ObservableObject {
     @Published var errorMessage: String?
 
     var isRecording: Bool { state == .recording }
+    /// Diagnostics for `--selftest`: system buffers in, mic buffers in, appended, dropped.
+    var audioCounters: (system: Int, mic: Int, appended: Int, dropped: Int) {
+        guard let capture else { return (0, 0, 0, 0) }
+        return (capture.systemAudioReceived, capture.micReceived, capture.audioAppended, capture.audioDropped)
+    }
     var isBusy: Bool { state != .idle }
 
     private var stream: SCStream?

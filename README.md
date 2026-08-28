@@ -79,10 +79,16 @@ Because that is the whole reason this exists, there is a one-command check:
 /Applications/OwlCap.app/Contents/MacOS/OwlCap --selftest 5
 ```
 
-It records the main display for five seconds with computer audio on, then prints what
-really ended up in the file — duration, track count, and whether any sound was heard.
-Play something first, or it will honestly report silence. Add `--mic` to test the
-microphone in the same pass.
+It records the main display for five seconds with computer audio on, then decodes the
+finished file and prints what really ended up in it — duration, video size, track
+count, and the loudest sample it can find. Play something first, or it will honestly
+report silence.
+
+| flag | what it checks |
+| --- | --- |
+| `--mic` | microphone capture, mixed in with computer audio |
+| `--audio-only` | audio-only `.m4a` recording |
+| `--region x,y,w,h` | area capture, in points from the display's top-left |
 
 ## Requirements
 
