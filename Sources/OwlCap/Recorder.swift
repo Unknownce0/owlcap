@@ -33,8 +33,6 @@ enum RecorderError: LocalizedError {
 enum CaptureTarget {
     case display(SCDisplay)
     case region(SCDisplay, CGRect)      // points, top-left origin, relative to the display
-    case window(SCWindow)
-    case app(SCRunningApplication, SCDisplay)
     case audioOnly(SCDisplay?)
 }
 
@@ -373,10 +371,6 @@ final class Recorder: ObservableObject {
         switch target {
         case .display(let display), .region(let display, _):
             return SCContentFilter(display: display, excludingWindows: ownWindows)
-        case .window(let window):
-            return SCContentFilter(desktopIndependentWindow: window)
-        case .app(let app, let display):
-            return SCContentFilter(display: display, including: [app], exceptingWindows: [])
         case .audioOnly(let display):
             if let display {
                 return SCContentFilter(display: display, excludingWindows: ownWindows)
@@ -388,12 +382,10 @@ final class Recorder: ObservableObject {
 
     private static func pointSize(for target: CaptureTarget) -> CGSize {
         switch target {
-        case .display(let d), .app(_, let d), .audioOnly(.some(let d)):
+        case .display(let d), .audioOnly(.some(let d)):
             return CGSize(width: d.width, height: d.height)
         case .region(_, let rect):
             return rect.size
-        case .window(let w):
-            return w.frame.size
         case .audioOnly(nil):
             return CGSize(width: 2, height: 2)
         }
@@ -402,10 +394,8 @@ final class Recorder: ObservableObject {
     static func scaleFactor(for target: CaptureTarget) -> CGFloat {
         var displayID: CGDirectDisplayID?
         switch target {
-        case .display(let d), .region(let d, _), .app(_, let d), .audioOnly(.some(let d)):
+        case .display(let d), .region(let d, _), .audioOnly(.some(let d)):
             displayID = d.displayID
-        case .window(let w):
-            displayID = NSScreen.screens.first { $0.frame.intersects(w.frame) }?.displayID
         case .audioOnly(nil):
             displayID = nil
         }

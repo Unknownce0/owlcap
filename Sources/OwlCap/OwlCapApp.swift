@@ -71,10 +71,9 @@ final class AppController: NSObject {
     let recorder = Recorder()
     private let settings = Settings.shared
     private lazy var bar = CaptureBar(controller: self)
+    private lazy var audioRecorder = AudioRecorderWindow(controller: self)
     private let selection = SelectionOverlay()
-    private let windowPicker = WindowPickerOverlay()
     private var statusItem: NSStatusItem?
-    private var pickedWindow: SCWindow?
     private var cancellables = Set<AnyCancellable>()
 
     override init() {
@@ -88,13 +87,6 @@ final class AppController: NSObject {
         }
         selection.onCommit = { [weak self] in self?.startRecording() }
         selection.onCancel = { [weak self] in self?.dismissCapture() }
-        windowPicker.onCancel = { [weak self] in self?.dismissCapture() }
-        windowPicker.onPick = { [weak self] window in
-            guard let self else { return }
-            self.pickedWindow = window
-            self.windowPicker.close()
-            self.startRecording()
-        }
 
         recorder.$state
             .sink { [weak self] state in self?.updateStatusItem(for: state) }
@@ -120,8 +112,8 @@ final class AppController: NSObject {
         guard !recorder.isBusy else { return }
         settings.audioOnly = true
         selection.hide()
-        windowPicker.close()
-        bar.show()
+        bar.close()
+        audioRecorder.show()
     }
 
     @objc func showCaptureBar() { showCaptureUI() }
@@ -131,12 +123,7 @@ final class AppController: NSObject {
         applyMode()
     }
 
-    func choose(source: CaptureSource?) {
-        guard let source else {
-            settings.audioOnly = true
-            applyMode()
-            return
-        }
+    func choose(source: CaptureSource) {
         settings.audioOnly = false
         settings.source = source
         applyMode()
@@ -146,30 +133,14 @@ final class AppController: NSObject {
         guard !recorder.isBusy else { return }
         if settings.audioOnly {
             selection.hide()
-            windowPicker.close()
             return
         }
         switch settings.source {
         case .region:
-            windowPicker.close()
             selection.show(initial: settings.rememberSelection ? settings.savedRegion : nil)
-        case .window:
+        case .display:
             selection.hide()
-            Task { await presentWindowPicker() }
-        case .display, .app:
-            selection.hide()
-            windowPicker.close()
         }
-    }
-
-    private func presentWindowPicker() async {
-        guard let content = try? await Recorder.shareableContent() else { return }
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        let windows = content.windows.filter { window in
-            guard let app = window.owningApplication, app.processID != ownPID else { return false }
-            return window.isOnScreen && window.frame.width > 60 && window.frame.height > 60
-        }
-        windowPicker.show(windows: windows)
     }
 
     // MARK: Recording
@@ -183,7 +154,6 @@ final class AppController: NSObject {
             }
             self.bar.hide()
             self.selection.hide()
-            self.windowPicker.close()
             self.recorder.start(target: target, settings: self.settings)
         }
     }
@@ -197,7 +167,6 @@ final class AppController: NSObject {
 
     @objc func dismissCapture() {
         selection.close()
-        windowPicker.close()
         bar.close()
     }
 
@@ -224,14 +193,6 @@ final class AppController: NSObject {
             else { return nil }
             settings.displayID = displayID
             return .region(target, local)
-        case .window:
-            guard let picked = pickedWindow,
-                  let fresh = content.windows.first(where: { $0.windowID == picked.windowID })
-            else { return nil }
-            return .window(fresh)
-        case .app:
-            guard let picked = pickedWindow, let app = picked.owningApplication, let display else { return nil }
-            return .app(app, display)
         }
     }
 
@@ -242,10 +203,13 @@ final class AppController: NSObject {
         case .recording, .finishing:
             if statusItem == nil {
                 let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                item.button?.image = NSImage(systemSymbolName: "stop.circle.fill",
+                item.button?.image = NSImage(systemSymbolName: "stop.circle",
                                              accessibilityDescription: "Stop Recording")
-                item.button?.imagePosition = .imageLeading
-                item.menu = statusMenu()
+                item.button?.image?.isTemplate = true
+                item.button?.toolTip = "Stop Recording"
+                // A click stops, the way QuickTime's does — no menu in the way.
+                item.button?.target = self
+                item.button?.action = #selector(stopRecording)
                 statusItem = item
             }
             refreshStatusTitle()
@@ -256,18 +220,9 @@ final class AppController: NSObject {
     }
 
     private func refreshStatusTitle() {
-        guard let button = statusItem?.button else { return }
-        button.title = " " + Self.timeString(recorder.elapsed)
-    }
-
-    private func statusMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "")
-            .target = self
-        let pause = menu.addItem(withTitle: recorder.isPaused ? "Resume" : "Pause",
-                                 action: #selector(togglePause), keyEquivalent: "")
-        pause.target = self
-        return menu
+        // The menu-bar item stays a bare stop button; the running time lives in the
+        // audio recorder window, where QuickTime shows it too.
+        audioRecorder.refresh()
     }
 
     private func presentError(_ message: String) {

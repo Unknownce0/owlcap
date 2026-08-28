@@ -86,10 +86,9 @@ private struct CaptureBarView: View {
 
             separator
 
-            ForEach(CaptureSource.allCases) { source in
-                modeButton(source)
-            }
-            modeButton(nil)   // audio only
+            // QuickTime's bar offers exactly two things: the whole screen, or a portion.
+            modeButton(.display, symbol: "display", help: "Record Entire Screen")
+            modeButton(.region, symbol: "rectangle.dashed", help: "Record Selected Portion")
 
             separator
 
@@ -121,23 +120,28 @@ private struct CaptureBarView: View {
             .padding(.horizontal, 2)
     }
 
-    /// `nil` means audio-only.
-    private func modeButton(_ source: CaptureSource?) -> some View {
-        let selected = source == nil ? settings.audioOnly : (!settings.audioOnly && settings.source == source)
-        let symbol = source?.symbol ?? "waveform"
-        let title = source?.label ?? "Audio Only"
+    private func modeButton(_ source: CaptureSource, symbol: String, help: String) -> some View {
+        let selected = !settings.audioOnly && settings.source == source
         return Button {
             controller?.choose(source: source)
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .regular))
-                .frame(width: 34, height: 28)
-                .background(selected ? Color.accentColor : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 7))
-                .foregroundStyle(selected ? Color.white : Color.primary)
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .regular))
+                // The little red dot macOS puts on its two record glyphs.
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 7, height: 7)
+                    .overlay(Circle().stroke(Color.black.opacity(0.25), lineWidth: 0.5))
+                    .offset(x: 3, y: 2)
+            }
+            .frame(width: 38, height: 28)
+            .background(selected ? Color.accentColor : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 7))
+            .foregroundStyle(selected ? Color.white : Color.primary)
         }
         .buttonStyle(.plain)
-        .help(title)
+        .help(help)
     }
 }
 

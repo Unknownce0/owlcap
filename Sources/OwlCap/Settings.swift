@@ -3,22 +3,12 @@ import AVFoundation
 import SwiftUI
 
 enum CaptureSource: String, CaseIterable, Identifiable {
-    case display, region, window, app
+    case display, region
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .display: return "Entire Screen"
-        case .region:  return "Selected Portion"
-        case .window:  return "Single Window"
-        case .app:     return "Application"
-        }
-    }
-    var symbol: String {
-        switch self {
-        case .display: return "display"
-        case .region:  return "crop"
-        case .window:  return "macwindow"
-        case .app:     return "app.badge"
+        case .display: return "Record Entire Screen"
+        case .region:  return "Record Selected Portion"
         }
     }
 }
