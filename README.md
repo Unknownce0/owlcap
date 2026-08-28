@@ -68,8 +68,25 @@ macOS gates both of the things this app needs. You only grant them once.
    **OwlCap** on. OwlCap will ask the first time you record.
 2. **Microphone** — only if you turn the microphone on.
 
-If you rebuild the app from source, macOS may ask again: an ad-hoc signature changes
-with every build, and the permission is tied to the signature.
+### If it keeps asking even though the switch is already on
+
+That is the ad-hoc signature, not you. macOS ties the Screen Recording grant to the
+app's exact signature, and an ad-hoc signature changes with every single build — so
+after a rebuild the switch in System Settings still looks on while the grant underneath
+no longer matches the app.
+
+Two things fix it:
+
+- **Quit and reopen OwlCap.** A running app keeps the answer it got at launch, so it
+  will keep asking until it is restarted. `./build.sh --install` now relaunches it for
+  you.
+- If it still asks, clear the stale grant and approve once more:
+
+  ```bash
+  ./build.sh --install --reset-permission
+  ```
+
+Downloaded releases are not affected — the permission sticks until you replace the app.
 
 ## Checking your audio actually works
 
