@@ -46,6 +46,22 @@ Clicks** — plus what it never had:
 - **Upload Size** — see below.
 - **When Finished** — open in QuickTime Player, show in Finder, or neither.
 
+## Recording a fullscreen app
+
+Click the **owl in the menu bar**, or press **⌘⇧6**, from inside the fullscreen app. The
+bar appears over it and your Space does not change.
+
+Clicking OwlCap in the **Dock** from a fullscreen Space will always bounce you out to the
+desktop first, and that is macOS, not OwlCap: activating an ordinary app makes the system
+apply *"when switching to an application, switch to a Space with open windows for the
+application"*, and a regular app's menu bar cannot be shown over another app's fullscreen
+Space. QuickTime behaves exactly the same way. A menu-bar click and a global shortcut
+don't activate the app at all, which is why they work — the same reason macOS's own ⌘⇧5
+can appear over a fullscreen window.
+
+(If you would rather the Dock icon behaved too, turning off that setting in System
+Settings › Desktop & Dock › Mission Control changes the Space-switching half of it.)
+
 ## Why recordings look bad on YouTube (and what to set)
 
 YouTube gives an upload its good VP9 encoder only at **1440p and above**. Anything

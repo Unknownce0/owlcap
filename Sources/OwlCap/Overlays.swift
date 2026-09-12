@@ -3,18 +3,28 @@ import QuartzCore
 
 // MARK: - Borderless overlay window
 
-final class OverlayWindow: NSWindow {
+final class OverlayWindow: NSPanel {
     init(frame: NSRect, interactive: Bool) {
-        super.init(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
+        // .nonactivatingPanel is the whole point: clicking this must not activate
+        // OwlCap, because activating a regular app pulls you out of whatever
+        // fullscreen Space you are in. NSWindow silently ignores this mask — only
+        // NSPanel honours it.
+        super.init(contentRect: frame,
+                   styleMask: [.borderless, .nonactivatingPanel],
+                   backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = .screenSaver
         ignoresMouseEvents = !interactive
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        isFloatingPanel = true
+        hidesOnDeactivate = false
         isReleasedWhenClosed = false
+        level = .screenSaver
+        // Always after `level` — setting the level clears collectionBehavior.
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
     }
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
 
 // MARK: - Click highlighting

@@ -41,7 +41,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = AppController()
         self.controller = controller
         MainMenuBuilder.install(target: controller)
-        NSApp.activate(ignoringOtherApps: true)
         controller.newScreenRecording()
     }
 
@@ -78,8 +77,10 @@ final class AppController: NSObject {
 
     override init() {
         super.init()
-        StopHotkey.shared.install()
-        StopHotkey.shared.onPress = { [weak self] in self?.stopRecording() }
+        Hotkeys.shared.onStop = { [weak self] in self?.stopRecording() }
+        Hotkeys.shared.onSummon = { [weak self] in self?.toggleCaptureBar() }
+        Hotkeys.shared.install()
+        installStatusItem()
 
         selection.onChange = { [weak self] rect in
             guard let self, self.settings.rememberSelection else { return }
@@ -198,25 +199,74 @@ final class AppController: NSObject {
 
     // MARK: Status item
 
-    private func updateStatusItem(for state: RecorderState) {
-        switch state {
-        case .recording, .finishing:
-            if statusItem == nil {
-                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                item.button?.image = NSImage(systemSymbolName: "stop.circle",
-                                             accessibilityDescription: "Stop Recording")
-                item.button?.image?.isTemplate = true
-                item.button?.toolTip = "Stop Recording"
-                // A click stops, the way QuickTime's does — no menu in the way.
-                item.button?.target = self
-                item.button?.action = #selector(stopRecording)
-                statusItem = item
-            }
-            refreshStatusTitle()
-        case .idle, .countdown:
-            if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
-            statusItem = nil
+    /// Lives in the menu bar for the whole session. This is the entry point that works
+    /// from inside a fullscreen app: clicking a status item does not activate OwlCap, so
+    /// macOS has no reason to switch you out of the Space you are in.
+    private func installStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.image = NSImage(systemSymbolName: "record.circle",
+                                     accessibilityDescription: "OwlCap")
+        item.button?.image?.isTemplate = true
+        item.button?.toolTip = "OwlCap — click to record (⌘⇧6)"
+        item.button?.target = self
+        item.button?.action = #selector(statusItemClicked)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        statusItem = item
+    }
+
+    @objc private func statusItemClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showStatusMenu()
+        } else if recorder.isRecording {
+            stopRecording()
+        } else {
+            toggleCaptureBar()
         }
+    }
+
+    private func showStatusMenu() {
+        let menu = NSMenu()
+        if recorder.isRecording {
+            add(to: menu, "Stop Recording", #selector(stopRecording))
+            add(to: menu, recorder.isPaused ? "Resume" : "Pause", #selector(togglePause))
+        } else {
+            add(to: menu, "New Screen Recording", #selector(newScreenRecording))
+            add(to: menu, "New Audio Recording", #selector(newAudioRecording))
+            if recorder.lastOutput != nil {
+                menu.addItem(.separator())
+                add(to: menu, "Open Last Recording", #selector(openLastRecording))
+            }
+        }
+        menu.addItem(.separator())
+        let quit = menu.addItem(withTitle: "Quit OwlCap", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        statusItem?.menu = menu
+        statusItem?.button?.performClick(nil)
+        statusItem?.menu = nil
+    }
+
+    private func add(to menu: NSMenu, _ title: String, _ action: Selector) {
+        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+        item.target = self
+    }
+
+    /// Summoned by ⌘⇧6 or a click on the menu bar icon.
+    @objc func toggleCaptureBar() {
+        guard !recorder.isBusy else { return }
+        if bar.isVisible {
+            dismissCapture()
+        } else {
+            showCaptureUI()
+        }
+    }
+
+    private func updateStatusItem(for state: RecorderState) {
+        let recording = state == .recording || state == .finishing
+        statusItem?.button?.image = NSImage(
+            systemSymbolName: recording ? "stop.circle" : "record.circle",
+            accessibilityDescription: recording ? "Stop Recording" : "OwlCap")
+        statusItem?.button?.image?.isTemplate = true
+        statusItem?.button?.toolTip = recording ? "Stop Recording (⌘⌃⎋)" : "OwlCap — click to record (⌘⇧6)"
     }
 
     private func refreshStatusTitle() {
@@ -288,8 +338,8 @@ enum MainMenuBuilder {
 
         let windowItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
-        add(to: windowMenu, "Show Capture Bar", #selector(AppController.showCaptureBar),
-            key: "1", modifiers: [.command], target: target)
+        add(to: windowMenu, "Show Capture Bar", #selector(AppController.toggleCaptureBar),
+            key: "6", modifiers: [.command, .shift], target: target)
         windowItem.submenu = windowMenu
         main.addItem(windowItem)
 
