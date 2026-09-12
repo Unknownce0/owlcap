@@ -43,7 +43,29 @@ Clicks** — plus what it never had:
 - Computer audio and a microphone **at once**, mixed into one track.
 - **Quality** — 24/30/60 fps, HEVC or H.264, `.mov` or `.mp4`, three quality levels, and
   full Retina resolution on or off.
+- **Upload Size** — see below.
 - **When Finished** — open in QuickTime Player, show in Finder, or neither.
+
+## Why recordings look bad on YouTube (and what to set)
+
+YouTube gives an upload its good VP9 encoder only at **1440p and above**. Anything
+shorter is re-encoded with H.264 at a much lower bitrate, which is exactly what turns
+crisp screen text into mush. A recording of a small selected portion — say a 900×560
+window — lands well under that line, so it gets the bad encoder no matter how clean the
+original file is.
+
+So **Options › Quality › Upload Size** defaults to **At Least 1440p**. It is a floor,
+not a size: a full-screen Retina recording is already taller than 1440p and is left
+alone, while a small selection is scaled up to clear the line before it is encoded.
+Upscaling adds no real detail, but it moves the upload into VP9's bucket, and the
+difference in how text survives is large.
+
+Two other things that help, if a recording still looks soft:
+
+- Let YouTube finish processing. The low-resolution H.264 version is published first and
+  the good one appears minutes to hours later — a video checked too early always looks bad.
+- Keep **Quality** on High. Screen content has hard edges and fine text, which need far
+  more bitrate than camera footage at the same apparent quality.
 
 ## Install
 

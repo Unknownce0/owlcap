@@ -70,7 +70,6 @@ final class CaptureBar: NSObject {
 private struct CaptureBarView: View {
     weak var controller: AppController?
     @ObservedObject private var settings = Settings.shared
-    @State private var hovered: CaptureSource?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -165,7 +164,9 @@ private struct BarBackground: NSViewRepresentable {
 
 private struct OptionsMenu: View {
     @ObservedObject private var settings = Settings.shared
-    @State private var microphones: [AVCaptureDeviceBox] = []
+    /// Read on demand rather than held as view state — the menu is built fresh each
+    /// time it opens, so a device plugged in since launch shows up.
+    private var microphones: [AVCaptureDeviceBox] { AVCaptureDeviceBox.all() }
 
     var body: some View {
         Menu("Options") {
@@ -216,6 +217,11 @@ private struct OptionsMenu: View {
                         check(q.label, settings.quality == q) { settings.quality = q }
                     }
                 }
+                Section("Upload Size") {
+                    ForEach(UploadSize.allCases) { size in
+                        check(size.label, settings.uploadSize == size) { settings.uploadSize = size }
+                    }
+                }
                 Section("Format") {
                     ForEach(VideoCodecChoice.allCases) { c in
                         check(c.label, settings.codec == c) { settings.codec = c }
@@ -236,7 +242,6 @@ private struct OptionsMenu: View {
             }
         }
         .menuStyle(.borderlessButton)
-        .onAppear { microphones = AVCaptureDeviceBox.all() }
     }
 
     private func check(_ title: String, _ on: Bool, action: @escaping () -> Void) -> some View {

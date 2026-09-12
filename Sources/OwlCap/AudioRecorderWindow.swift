@@ -55,7 +55,7 @@ private struct AudioRecorderView: View {
     @ObservedObject var recorder: Recorder
     weak var controller: AppController?
     @ObservedObject private var settings = Settings.shared
-    @State private var microphones: [AVCaptureDeviceBox] = []
+    private var microphones: [AVCaptureDeviceBox] { AVCaptureDeviceBox.all() }
 
     private var recording: Bool { recorder.isRecording }
 
@@ -124,7 +124,6 @@ private struct AudioRecorderView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .onAppear { microphones = AVCaptureDeviceBox.all() }
     }
 
     private var sourceSummary: String {

@@ -60,6 +60,9 @@ final class SelectionOverlay {
         let window = self.window ?? OverlayWindow(frame: frame, interactive: true)
         window.setFrame(frame, display: false)
         window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) + 1)
+        // Setting the level clears collectionBehavior, so re-apply it afterwards or the
+        // selection stays behind on one Space while the bar follows you to the next.
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
 
         let view = self.view ?? SelectionView(frame: NSRect(origin: .zero, size: frame.size))
         view.frame = NSRect(origin: .zero, size: frame.size)

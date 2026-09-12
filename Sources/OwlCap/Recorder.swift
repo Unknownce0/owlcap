@@ -163,8 +163,16 @@ final class Recorder: ObservableObject {
                 config.sourceRect = rect
                 config.scalesToFit = false
             }
-            let w = Int((size.width * scale).rounded()) & ~1
-            let h = Int((size.height * scale).rounded()) & ~1
+            var w = Int((size.width * scale).rounded()) & ~1
+            var h = Int((size.height * scale).rounded()) & ~1
+            // Lift small captures over YouTube's 1440p line. ScreenCaptureKit does the
+            // scaling itself, and keeping the exact aspect ratio avoids black bars.
+            let floorHeight = settings.uploadSize.minimumHeight
+            if floorHeight > 0, h < floorHeight, h > 0 {
+                let aspect = Double(w) / Double(h)
+                h = floorHeight
+                w = Int((Double(floorHeight) * aspect).rounded()) & ~1
+            }
             config.width = max(2, w)
             config.height = max(2, h)
             config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.frameRate))

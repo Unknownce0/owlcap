@@ -26,9 +26,9 @@ enum VideoQuality: String, CaseIterable, Identifiable {
     /// Bits per pixel per frame — multiplied by width*height*fps to get a bitrate.
     var bitsPerPixel: Double {
         switch self {
-        case .high:   return 0.20
-        case .medium: return 0.11
-        case .low:    return 0.055
+        case .high:   return 0.26
+        case .medium: return 0.14
+        case .low:    return 0.07
         }
     }
 }
@@ -38,6 +38,29 @@ enum VideoCodecChoice: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String { self == .hevc ? "HEVC (H.265)" : "H.264" }
     var avCodec: AVVideoCodecType { self == .hevc ? .hevc : .h264 }
+}
+
+/// YouTube only hands uploads its better VP9 encoder at 1440p and above; anything
+/// shorter gets H.264 at a much lower bitrate, which is what turns screen text to mush.
+/// So this is a floor, not a size: it never shrinks a recording, it only lifts a small
+/// one over that line.
+enum UploadSize: String, CaseIterable, Identifiable {
+    case native, atLeast1440, atLeast2160
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .native:       return "Native Size"
+        case .atLeast1440:  return "At Least 1440p (YouTube)"
+        case .atLeast2160:  return "At Least 2160p"
+        }
+    }
+    var minimumHeight: Int {
+        switch self {
+        case .native:      return 0
+        case .atLeast1440: return 1440
+        case .atLeast2160: return 2160
+        }
+    }
 }
 
 enum AfterRecording: String, CaseIterable, Identifiable {
@@ -82,6 +105,7 @@ final class Settings: ObservableObject {
     @Published var saveFolderPath: String { didSet { save(saveFolderPath, "saveFolder") } }
     @Published var rememberSelection: Bool { didSet { save(rememberSelection, "rememberSelection") } }
     @Published var afterRecording: AfterRecording { didSet { save(afterRecording.rawValue, "afterRecording") } }
+    @Published var uploadSize: UploadSize { didSet { save(uploadSize.rawValue, "uploadSize") } }
     /// The last selected area, remembered between recordings the way QuickTime does.
     /// Stored in global screen points, bottom-left origin.
     @Published var savedRegion: CGRect? { didSet { save(Self.encode(savedRegion), "savedRegion") } }
@@ -126,6 +150,7 @@ final class Settings: ObservableObject {
         audioOnly = d.bool(forKey: "audioOnly")
         rememberSelection = d.bool(forKey: "rememberSelection")
         afterRecording = AfterRecording(rawValue: d.string(forKey: "afterRecording") ?? "") ?? .openInPlayer
+        uploadSize = UploadSize(rawValue: d.string(forKey: "uploadSize") ?? "") ?? .atLeast1440
         savedRegion = Self.decode(d.string(forKey: "savedRegion"))
         saveFolderPath = d.string(forKey: "saveFolder")
             ?? FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first?.path
